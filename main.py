@@ -13,7 +13,7 @@ def get_last_comic_number():
     return last_number
 
 
-def get_img_url_and_comment(comic_number):
+def get_url_comment_num(comic_number):
     url = f'https://xkcd.com/{comic_number}/info.0.json'
     response = requests.get(url)
     response.raise_for_status()
@@ -24,15 +24,13 @@ def get_img_url_and_comment(comic_number):
     return img_url, author_comment, comic_num
 
 
-def save_comic(img_url, comics_path, comic_num):
-    os.makedirs(comics_path, exist_ok=True)
+def save_comic_return_name(img_url, comic_num):
     split_url = os.path.splitext(img_url)
     head_url, extension = split_url
     img_response = requests.get(img_url)
     img_response.raise_for_status()
     comic_name = "comic_{}{}".format(comic_num, extension)
-    file_path = os.path.join(comics_path, comic_name)
-    with open(file_path, 'wb') as img_file:
+    with open(comic_name, 'wb') as img_file:
         img_file.write(img_response.content)
     return comic_name
 
@@ -50,12 +48,8 @@ def get_load_discription(group_id, access_token, version):
     return load_discription
 
 
-def load_to_server(upload_url, comic_name, comics_path):
-    for root, dirs, files in os.walk(comics_path):
-        for file in files:
-            if file == comic_name:
-                img_root = os.path.join(root, file)
-    with open(img_root, 'rb') as comic:
+def load_to_server_return_vk_data(upload_url, comic_name):
+    with open(comic_name, 'rb') as comic:
         url = upload_url
         files = {
             'photo': comic,
@@ -69,8 +63,8 @@ def load_to_server(upload_url, comic_name, comics_path):
         return vk_server, vk_photo, vk_hash
 
 
-def save_to_album(access_token, user_id, group_id, server,
-                  photo, hash, version):
+def save_to_album_return_id(access_token, user_id, group_id,
+                            server, photo, hash, version):
     url = "https://api.vk.com/method/photos.saveWallPhoto"
     params = {
         "access_token": access_token,
@@ -104,35 +98,32 @@ def post_to_group(access_token, group_id, auth_comment,
     }
     response = requests.post(url, params=params)
     response.raise_for_status()
-    response_discription = response.json()
-    return response_discription
 
 
 def main():
     load_dotenv()
-    comics_path = os.environ.get("COMICS_PATH")
-    client_id = os.environ.get("CLIENT_ID")
-    secure_key = os.environ.get("SECURE_KEY")
-    service_key = os.environ.get("SERVICE_KEY")
     access_token = os.environ.get("ACCESS_TOKEN")
     group_id = os.environ.get("GROUP_ID")
     api_version = os.environ.get("API_VERSION")
     user_id = os.environ.get("USER_ID")
     last_comic_number = get_last_comic_number()
     random_comic_number = random.randint(1, last_comic_number)
-    img_url, auth_comment, comic_num = get_img_url_and_comment(
+    img_url, auth_comment, comic_num = get_url_comment_num(
                                                 random_comic_number)
-    comic_name = save_comic(img_url, comics_path, comic_num)
+    comic_name = save_comic_return_name(img_url, comic_num)
     load_discription = get_load_discription(group_id, access_token,
                                             api_version)
     upload_url = load_discription['response']['upload_url']
-    vk_server, vk_photo, vk_hash = load_to_server(upload_url, comic_name,
-                                                  comics_path)
-    owner_id, media_id = save_to_album(access_token, user_id, group_id,
-                                       vk_server, vk_photo, vk_hash,
-                                       api_version)
+    vk_server, vk_photo, vk_hash = load_to_server_return_vk_data(
+                                                            upload_url,
+                                                            comic_name)
+    owner_id, media_id = save_to_album_return_id(access_token, user_id,
+                                                 group_id, vk_server,
+                                                 vk_photo, vk_hash,
+                                                 api_version)
     post_to_group(access_token, group_id, auth_comment,
                   owner_id, media_id, api_version)
+    os.remove(comic_name)
 
 
 if __name__ == '__main__':
