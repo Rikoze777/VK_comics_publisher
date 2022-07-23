@@ -55,7 +55,6 @@ def load_to_server(upload_url, comic_name):
         }
         response = requests.post(upload_url, files=files)
         response.raise_for_status()
-    comic.closed
     load_response = response.json()
     vk_server = load_response['server']
     vk_photo = load_response['photo']
